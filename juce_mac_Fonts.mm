@@ -58,13 +58,44 @@ namespace CoreTextTypeLayout
                                                                  &kCFTypeDictionaryKeyCallBacks,
                                                                  &kCFTypeDictionaryValueCallBacks);
         CFRelease (cfFontStyle);
-        CFRelease (cfFontFamily);
 
         CTFontDescriptorRef ctFontDescRef = CTFontDescriptorCreateWithAttributes (fontDescAttributes);
         CFRelease (fontDescAttributes);
 
         CTFontRef ctFontRef = CTFontCreateWithFontDescriptor (ctFontDescRef, fontSize, nullptr);
         CFRelease (ctFontDescRef);
+
+        // Due to Apple bug CTFontCreateWithFontDescriptor fails in Garageband and Logic Pro on OSX 10.6
+        // In this case we must create the font the old way using the family name only
+        CFStringRef cfActualFontFamily = (CFStringRef) CTFontCopyAttribute(ctFontRef, kCTFontFamilyNameAttribute);
+        CFComparisonResult result = CFStringCompare(cfFontFamily, cfActualFontFamily, 0);
+        if (result != kCFCompareEqualTo)
+        {
+            CFRelease (ctFontRef);
+            ctFontRef = CTFontCreateWithName (cfFontFamily, fontSize, nullptr);
+            if (font.isItalic())
+            {
+                CTFontRef newFont = CTFontCreateCopyWithSymbolicTraits (ctFontRef, 0.0f, nullptr,
+                                                                        kCTFontItalicTrait, kCTFontItalicTrait);
+                if (newFont != nullptr)
+                {
+                    CFRelease (ctFontRef);
+                    ctFontRef = newFont;
+                }
+            }
+            if (font.isBold())
+            {
+                CTFontRef newFont = CTFontCreateCopyWithSymbolicTraits (ctFontRef, 0.0f, nullptr,
+                                                                        kCTFontBoldTrait, kCTFontBoldTrait);
+                if (newFont != nullptr)
+                {
+                    CFRelease (ctFontRef);
+                    ctFontRef = newFont;
+                }
+            }
+        }
+        CFRelease (cfActualFontFamily);
+        CFRelease (cfFontFamily);
 
         if (applyScaleFactor)
         {
